@@ -27,6 +27,7 @@ declare namespace YT {
   class Player {
     constructor(element: HTMLElement, options: PlayerOptions);
     loadVideoById(videoId: string): void;
+    cueVideoById(videoId: string): void;
     playVideo(): void;
     pauseVideo(): void;
     stopVideo(): void;
