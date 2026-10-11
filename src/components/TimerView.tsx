@@ -41,7 +41,7 @@ export default function TimerView({ slots, options, onFinish }: Props) {
         ) : (
           <span className="muted">
             {phase === "ready"
-              ? "시작을 누르면 첫 곡이 재생돼요."
+              ? "시작 버튼이나 영상을 눌러 시작해요."
               : slot.tracks.length > 0
                 ? "이번 구간의 곡을 모두 들었어요. 남은 시간은 조용히 집중해요."
                 : "음악 없이 쉬는 시간이에요."}
@@ -51,6 +51,7 @@ export default function TimerView({ slots, options, onFinish }: Props) {
 
       {/* YouTube 약관상 플레이어는 화면에 보이도록 둔다 */}
       <div className="player" ref={session.containerRef} />
+      <p className="muted">영상을 눌러도 재생/일시정지돼요. 곡 건너뛰기는 할 수 없어요.</p>
 
       {slot.tracks.length > 0 && (
         <ul className="tracks queue">

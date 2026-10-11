@@ -69,7 +69,8 @@ export function usePomodoro({ slots, options, onFinish }: Params) {
     });
   };
 
-  const playTrack = (targetSlotIndex: number, targetTrackIndex: number) => {
+  // load=false: 임베드에서 이미 재생을 시작한 곡이라 다시 불러오지 않는다.
+  const playTrack = (targetSlotIndex: number, targetTrackIndex: number, load = true) => {
     const track = slots[targetSlotIndex]?.tracks[targetTrackIndex];
     setTrackElapsedSec(0);
     if (!track) {
@@ -79,7 +80,7 @@ export function usePomodoro({ slots, options, onFinish }: Params) {
     }
     currentTrackRef.current = { slotIndex: targetSlotIndex, trackIndex: targetTrackIndex, track };
     setTrackIndex(targetTrackIndex);
-    player.loadVideo(track.id);
+    if (load) player.loadVideo(track.id);
   };
 
   const player = useYouTubePlayer({
@@ -90,6 +91,23 @@ export function usePomodoro({ slots, options, onFinish }: Params) {
       closeCurrentTrack(current.track.durationSec);
       playTrack(current.slotIndex, current.trackIndex + 1);
     },
+    // 임베드를 직접 눌러 재생/일시정지해도 타이머가 함께 시작/멈춤/이어지도록 동기화한다.
+    // 앱 버튼으로 일으킨 변화는 phase가 먼저 바뀌므로 아래 분기에 걸리지 않는다.
+    onStateChange: (state) => {
+      const playerState = window.YT?.PlayerState;
+      if (!playerState) return;
+
+      if (phaseRef.current === "ready") {
+        if (state === playerState.PLAYING) startSession(true);
+        return;
+      }
+      if (!currentTrackRef.current) return;
+      if (phaseRef.current === "running" && state === playerState.PAUSED) {
+        pauseSession(true);
+      } else if (phaseRef.current === "paused" && state === playerState.PLAYING) {
+        resumeSession(true);
+      }
+    },
     // 재생 불가 영상은 건너뛴다.
     onError: () => {
       const current = currentTrackRef.current;
@@ -99,13 +117,13 @@ export function usePomodoro({ slots, options, onFinish }: Params) {
     },
   });
 
-  const startSlot = (index: number) => {
+  const startSlot = (index: number, loadFirstTrack = true) => {
     const slot = slots[index];
     slotIndexRef.current = index;
     setSlotIndex(index);
     slotEndAtRef.current = Date.now() + slot.targetSec * 1000;
     setRemainingSec(slot.targetSec);
-    playTrack(index, 0);
+    playTrack(index, 0, loadFirstTrack);
   };
 
   const finish = (completed: boolean) => {
@@ -158,24 +176,32 @@ export function usePomodoro({ slots, options, onFinish }: Params) {
     return () => window.clearInterval(timer);
   }, [phase]);
 
-  const start = () => {
+  // 시작 전에 첫 곡을 불러만 둔다. 이렇게 해야 시작 버튼 대신 영상을 눌러도 정상 재생된다.
+  const firstTrackId = slots[0]?.tracks[0]?.id;
+  useEffect(() => {
+    if (player.ready && phase === "ready" && firstTrackId) player.cueVideo(firstTrackId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player.ready, firstTrackId]);
+
+  // fromEmbed: 임베드에서 시작한 변화라 플레이어를 다시 조작하지 않는다.
+  const startSession = (fromEmbed: boolean) => {
     if (phaseRef.current !== "ready" || slots.length === 0) return;
     startedAtRef.current = new Date();
     updatePhase("running");
-    startSlot(0);
+    startSlot(0, !fromEmbed);
   };
 
-  const pause = () => {
+  const pauseSession = (fromEmbed: boolean) => {
     if (phaseRef.current !== "running") return;
     pausedRemainingMsRef.current = Math.max(0, slotEndAtRef.current - Date.now());
-    player.pause();
+    if (!fromEmbed) player.pause();
     updatePhase("paused");
   };
 
-  const resume = () => {
+  const resumeSession = (fromEmbed: boolean) => {
     if (phaseRef.current !== "paused") return;
     slotEndAtRef.current = Date.now() + pausedRemainingMsRef.current;
-    if (currentTrackRef.current) player.resume();
+    if (!fromEmbed && currentTrackRef.current) player.resume();
     updatePhase("running");
   };
 
@@ -201,9 +227,10 @@ export function usePomodoro({ slots, options, onFinish }: Params) {
     trackIndex,
     remainingSec,
     trackElapsedSec,
-    start,
-    pause,
-    resume,
+    // 버튼 onClick이 이벤트 객체를 넘겨도 fromEmbed로 오해하지 않도록 래퍼로 감싼다.
+    start: () => startSession(false),
+    pause: () => pauseSession(false),
+    resume: () => resumeSession(false),
     stopEarly,
   };
 }

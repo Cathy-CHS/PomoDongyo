@@ -25,6 +25,8 @@ function loadYouTubeApi(): Promise<void> {
 interface PlayerHandlers {
   onEnded: () => void;
   onError: (code: number) => void;
+  // 임베드 쪽에서 재생 상태가 바뀔 때 호출된다 (YT.PlayerState 값)
+  onStateChange?: (state: number) => void;
 }
 
 /**
@@ -55,13 +57,22 @@ export function useYouTubePlayer(handlers: PlayerHandlers) {
       playerRef.current = new window.YT.Player(mount, {
         width: "100%",
         height: "100%",
-        playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
+        playerVars: {
+          playsinline: 1,
+          rel: 0,
+          modestbranding: 1,
+          controls: 0, // 재생 제어는 앱의 버튼으로만 한다
+          disablekb: 1, // 키보드 단축키(재생/탐색) 비활성화
+          fs: 0, // 전체화면 버튼/더블클릭 전체화면 비활성화
+          origin: window.location.origin,
+        },
         events: {
           onReady: () => {
             if (!cancelled) setReady(true);
           },
           onStateChange: (event) => {
             if (event.data === window.YT?.PlayerState.ENDED) handlersRef.current.onEnded();
+            handlersRef.current.onStateChange?.(event.data);
           },
           onError: (event) => handlersRef.current.onError(event.data),
         },
@@ -78,10 +89,12 @@ export function useYouTubePlayer(handlers: PlayerHandlers) {
   }, []);
 
   const loadVideo = useCallback((videoId: string) => playerRef.current?.loadVideoById(videoId), []);
+  // 재생하지 않고 영상만 불러 둔다. (시작 전에 영상을 눌러도 정상 재생되게 하기 위함)
+  const cueVideo = useCallback((videoId: string) => playerRef.current?.cueVideoById(videoId), []);
   const pause = useCallback(() => playerRef.current?.pauseVideo(), []);
   const resume = useCallback(() => playerRef.current?.playVideo(), []);
   const stop = useCallback(() => playerRef.current?.stopVideo(), []);
   const getCurrentTime = useCallback(() => playerRef.current?.getCurrentTime() ?? 0, []);
 
-  return { containerRef, ready, loadVideo, pause, resume, stop, getCurrentTime };
+  return { containerRef, ready, loadVideo, cueVideo, pause, resume, stop, getCurrentTime };
 }
