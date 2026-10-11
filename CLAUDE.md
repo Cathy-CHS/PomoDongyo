@@ -25,7 +25,9 @@ PomoDongyo — 타이머가 아닌 **플레이리스트의 곡 단위**로 집�
 - **문서화**: 한국어로 작성
 - **변수명/함수명**: 영어 (코드 표준 준수)
 
-## 기술 스택- **Next.js (App Router) + TypeScript**, Vercel 배포. API 키를 숨기는 서버 Route Handler를 같은 프로젝트에 둔다.
+## 기술 스택
+
+- **Next.js (App Router) + TypeScript**, Vercel 배포. API 키를 숨기는 서버 Route Handler를 같은 프로젝트에 둔다.
 - **YouTube Data API v3 필요** (링크만으로는 곡 목록·길이를 알 수 없음):
   - `playlistItems.list` (maxResults=50, nextPageToken 반복) → 영상 ID/제목
   - `videos.list?part=contentDetails,status` (50개씩 배치) → ISO8601 duration, embeddable 여부
